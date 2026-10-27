@@ -239,7 +239,7 @@ final class CinematicHome extends FrameLayout {
     }
     void pause() { active = false; generation++; removeCallbacks(readings); }
     void close() { closed = true; pause(); loader.shutdownNow(); }
-    void home() { selectedRow = 0; remembered[0] = 0; focusShelf(0, 0); }
+    void home() { selected = ""; selectedRow = 0; remembered[0] = 0; focusShelf(0, 0); }
     private void focusShelf(int row, int position) {
         int target = ShelfNavigation.clamp(position, apps.get(row).size());
         if (target < 0) { menu.get(0).requestFocus(); return; }

@@ -1,4 +1,6 @@
 <resources>
+    <!-- Fork-only build flag, deliberately separate from the shared theme configuration. -->
+    <bool name="cinematic_redesign">true</bool>
     <string name="cinema_home">Home</string>
     <string name="cinema_welcome">Your evening starts here.</string>
     <string name="cinema_hint">Your apps. Your space. Enjoy the big screen.</string>

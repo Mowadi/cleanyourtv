@@ -303,28 +303,31 @@ final class CinematicHome extends FrameLayout {
     private final class Tile extends RecyclerView.ViewHolder {
         final ImageView art;
         final TextView label;
-        Tile(LinearLayout card, ImageView art, TextView label) { super(card); this.art = art; this.label = label; }
+        Tile(FrameLayout card, ImageView art, TextView label) { super(card); this.art = art; this.label = label; }
     }
     private final class ShelfAdapter extends RecyclerView.Adapter<Tile> {
         final int row;
         ShelfAdapter(int row) { this.row = row; }
         @Override public int getItemCount() { return apps.get(row).size(); }
         @Override public Tile onCreateViewHolder(ViewGroup parent, int type) {
-            LinearLayout card = new LinearLayout(activity);
-            card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(dp(6), dp(5), dp(6), dp(4));
+            FrameLayout card = new FrameLayout(activity);
             card.setFocusable(true); card.setClickable(true);
             RecyclerView.LayoutParams params = new RecyclerView.LayoutParams(dp(174), -1);
             params.rightMargin = dp(8);
             card.setLayoutParams(params);
-            card.setBackground(panel(0xB31D252B, 10, 0x20FFFFFF));
+            card.setBackground(panel(0xFF182128, 10, 0));
+            // Clip the complete artwork surface, including adaptive icons, to the same silhouette.
+            card.setClipToOutline(true);
+            card.setForeground(panel(Color.TRANSPARENT, 10, 0x30FFFFFF));
             ImageView art = new ImageView(activity);
             art.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            card.addView(art, new LinearLayout.LayoutParams(-1, 0, 1));
+            art.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            card.addView(art, new FrameLayout.LayoutParams(-1, -1));
             TextView label = text("", 12, Color.WHITE);
             label.setSingleLine(true); label.setEllipsize(TextUtils.TruncateAt.END);
             label.setGravity(Gravity.CENTER);
-            card.addView(label, new LinearLayout.LayoutParams(-1, dp(20)));
+            label.setPadding(dp(8), 0, dp(8), 0);
+            card.addView(label, new FrameLayout.LayoutParams(-1, dp(22), Gravity.BOTTOM));
             return new Tile(card, art, label);
         }
         @Override public void onBindViewHolder(Tile holder, int position) {
@@ -332,30 +335,56 @@ final class CinematicHome extends FrameLayout {
             holder.label.setText(app.label);
             holder.itemView.setContentDescription(app.label);
             boolean isFocused = holder.itemView.hasFocus();
-            holder.itemView.setBackground(panel(isFocused ? 0xE6404C56 : 0xB31D252B, 10, isFocused ? Color.WHITE : 0x20FFFFFF));
+            holder.itemView.setForeground(panel(Color.TRANSPARENT, 10, isFocused ? Color.WHITE : 0x30FFFFFF));
             holder.itemView.setScaleX(isFocused ? 1.035f : 1f);
             holder.itemView.setScaleY(isFocused ? 1.035f : 1f);
             holder.art.setImageDrawable(null);
+            holder.art.setPadding(dp(16), dp(12), dp(16), dp(28));
+            holder.label.setVisibility(View.VISIBLE);
             // Decode artwork on the same bounded worker; recycled holders discard stale results.
             holder.art.setTag(app.component);
             loader.execute(() -> {
                 Drawable art = null;
+                boolean banner = false;
                 try {
                     String custom = config.appBanners.get(app.component.getPackageName());
                     int resource = custom != null && custom.startsWith("banner_")
                             ? getResources().getIdentifier(custom, "drawable", activity.getPackageName()) : 0;
                     if (resource != 0) art = activity.getDrawable(resource);
-                    if (art == null) art = app.info.activityInfo.loadBanner(activity.getPackageManager());
-                    if (art == null) art = app.info.loadIcon(activity.getPackageManager());
-                } catch (RuntimeException ignored) { /* An app can disappear while its artwork is loading. */ }
+                    if (art == null) {
+                        PackageManager pm = activity.getPackageManager();
+                        int id = app.info.activityInfo.banner;
+                        if (id == 0) id = app.info.activityInfo.applicationInfo.banner;
+                        if (id != 0) {
+                            android.content.res.Resources resources = pm.getResourcesForApplication(app.info.activityInfo.applicationInfo);
+                            int density = Math.max(android.util.DisplayMetrics.DENSITY_XHIGH, getResources().getDisplayMetrics().densityDpi);
+                            art = resources.getDrawableForDensity(id, density, null);
+                        }
+                        if (art == null) art = app.info.activityInfo.loadBanner(pm);
+                    }
+                    banner = art != null && AppAdapter.isBannerShaped(art.getIntrinsicWidth(), art.getIntrinsicHeight());
+                    if (!banner) art = app.info.loadIcon(activity.getPackageManager());
+                } catch (PackageManager.NameNotFoundException | RuntimeException ignored) {
+                    // Missing or broken banner resources still get the installed app's original icon.
+                    banner = false;
+                    try { art = app.info.loadIcon(activity.getPackageManager()); }
+                    catch (RuntimeException missing) { art = null; }
+                }
                 final Drawable image = art;
+                final boolean isBanner = banner;
                 post(() -> {
-                    if (!closed && app.component.equals(holder.art.getTag())) holder.art.setImageDrawable(image);
+                    if (!closed && app.component.equals(holder.art.getTag())) {
+                        // FIT_CENTER preserves the source ratio and every pixel of its artwork.
+                        int side = isBanner ? 0 : dp(16);
+                        holder.art.setPadding(side, isBanner ? 0 : dp(12), side, isBanner ? 0 : dp(28));
+                        holder.label.setVisibility(isBanner ? View.GONE : View.VISIBLE);
+                        holder.art.setImageDrawable(image);
+                    }
                 });
             });
             holder.itemView.setOnClickListener(v -> launch(app));
             holder.itemView.setOnFocusChangeListener((v, focused) -> {
-                v.setBackground(panel(focused ? 0xE6404C56 : 0xB31D252B, 10, focused ? Color.WHITE : 0x20FFFFFF));
+                v.setForeground(panel(Color.TRANSPARENT, 10, focused ? Color.WHITE : 0x30FFFFFF));
                 v.setScaleX(focused ? 1.035f : 1f); v.setScaleY(focused ? 1.035f : 1f);
                 if (focused) {
                     remembered[row] = holder.getBindingAdapterPosition();

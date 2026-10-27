@@ -137,6 +137,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean coocaaSources;
 
     private AppAdapter adapter;
+    private CinematicHome cinematicHome;
     private RecyclerView grid;
     private FrameLayout root;
     private WallpaperPlayer wallpaperPlayer;
@@ -358,6 +359,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // In the background this only marks the tiles stale; onResume rebuilds them once.
             if (!tileRefresh.onPackagesChanged()) return;
             reloadApps(false);
+            if (cinematicHome != null) cinematicHome.resume();
             if (appLibrary != null) appLibrary.refresh();
         }
     };
@@ -842,6 +844,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
                     .build(), vpnCallback);
         }
+        if (getResources().getBoolean(R.bool.cinematic_redesign)) {
+            // Retain the activity identity and input routing; replace the presentation only.
+            // WallpaperPlayer's anonymous ImageView remains behind the new presentation.
+            for (int i = 0; i < root.getChildCount(); i++) {
+                View child = root.getChildAt(i);
+                if (!(child instanceof ImageView && child.getId() == View.NO_ID)) child.setVisibility(View.GONE);
+            }
+            root.setBackgroundResource(R.drawable.cinema_landscape);
+            cinematicHome = new CinematicHome(this, cfg, this::showInputs);
+            root.addView(cinematicHome, new FrameLayout.LayoutParams(-1, -1));
+        }
         // Not after recreate(): the launch intent survives it and would open the settings again.
         if (savedInstanceState == null && !openLauncherSettingsIfAsked(getIntent())) openInputsIfAsked(getIntent());
     }
@@ -869,7 +882,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean openInputsIfAsked(Intent intent) {
         if (intent == null || !ACTION_VIEW_INPUTS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
-        View anchor = topMenu ? findViewById(R.id.btnSettings) : btnInputs;
+        View anchor = cinematicHome != null ? cinematicHome.inputs : topMenu ? findViewById(R.id.btnSettings) : btnInputs;
         if (anchor.getVisibility() != View.VISIBLE) return true;
         if (anchor.isLaidOut()) {
             // Android 9 delivers a new intent to a paused activity with a brief resume and pause around it, and
@@ -914,6 +927,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (openLauncherSettingsIfAsked(intent)) return;
         if (openInputsIfAsked(intent)) return;
         if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return;
+        if (cinematicHome != null) cinematicHome.home();
         grid.scrollToPosition(0);
         lastFocused = 0;
         lastFocusedKey = adapter.getItemCount() > 0 ? adapter.keyAt(0) : null;
@@ -985,7 +999,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             updateInputsButton();
             pillsShown = true;
         }
-        if (showStats) startStats();
+        if (showStats && cinematicHome == null) startStats();
+        if (cinematicHome != null) {
+            root.setBackgroundResource(R.drawable.cinema_landscape);
+            cinematicHome.resume();
+        }
         sky.update();
         wallpaperPlayer.start();
         handler.postDelayed(minuteTick, MINUTE_MS);
@@ -1043,6 +1061,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      *                 on a return to the same tiles it would only mark a change that didn't happen.
      */
     private void reloadApps(boolean animate, boolean rebuild, boolean entrance) {
+        if (cinematicHome != null) { tilesReady = true; return; }
         cancelPendingFocusScroll();
         RecyclerView.ViewHolder footer = grid.findViewHolderForAdapterPosition(adapter.appCount());
         final boolean restoreLibrary = adapter.isLibraryAt(adapter.appCount()) && footer != null
@@ -1157,6 +1176,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root.removeCallbacks(showIdleClock);
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
+        if (cinematicHome != null) cinematicHome.pause();
         stopAmbientAnimation();
         hero.animate().cancel();
         ambient.animate().cancel();
@@ -1218,6 +1238,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onDestroy();
         unregisterReceiver(packageReceiver);
         wallpaperPlayer.close();
+        if (cinematicHome != null) cinematicHome.close();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (tim != null) tim.unregisterCallback(inputCallback);
@@ -1588,7 +1609,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     public void onBackPressed() {
-        // Home screen: Back goes nowhere.
+        if (cinematicHome != null) cinematicHome.home();
+        // Home screen: Back stays on Home.
     }
 
     // ---- glass highlight -------------------------------------------------------------------------
@@ -3007,7 +3029,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Read the switch, not the pill: show_inputs_pill=false hides the pill too, and there the list
         // keeps its usual place.
         boolean underGear = topMenu;
-        View anchor = findViewById(underGear ? R.id.btnSettings : R.id.btnInputs);
+        View anchor = cinematicHome != null ? cinematicHome.inputs : findViewById(underGear ? R.id.btnSettings : R.id.btnInputs);
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
         LinearLayout rows = panel.findViewById(R.id.rows);
 

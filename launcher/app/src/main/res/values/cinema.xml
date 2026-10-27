@@ -1,0 +1,10 @@
+<resources>
+    <string name="cinema_home">Home</string>
+    <string name="cinema_welcome">Your evening starts here.</string>
+    <string name="cinema_hint">Your apps. Your space. Enjoy the big screen.</string>
+    <string name="cinema_featured">Featured apps</string>
+    <string name="cinema_all_apps">All apps</string>
+    <string name="cinema_open">Press OK to open</string>
+    <string name="cinema_capacity">RAM %1$s / %2$s GB used   ·   Storage %3$s / %4$s GB used</string>
+    <string name="cinema_empty">No launchable apps found. Use the menu to open Settings or Inputs.</string>
+</resources>

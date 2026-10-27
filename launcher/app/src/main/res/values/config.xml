@@ -7,6 +7,9 @@
 -->
 <resources>
 
+    <!-- Fork presentation. false restores the original interface without changing Home identity. -->
+    <bool name="cinematic_redesign">true</bool>
+
     <!-- Tried in order when no standard settings handler is usable; each package must also be visible
          through <queries> in the manifest. -->
     <string-array name="settings_fallback_components" translatable="false">

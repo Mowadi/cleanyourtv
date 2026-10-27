@@ -43,6 +43,7 @@ A new key needs one there in the same pull request.
 
 | Key | Type | Meaning |
 |---|---|---|
+| `cinematic_redesign` | bool (config.xml only, Mowadi fork) | Enable the cinematic presentation; false restores the original interface. Not a JSON theme key. See [Cinematic Home](../docs/CINEMATIC_HOME.md). |
 | `dock_apps` | list of package names | The dock row, in order; missing apps are skipped |
 | `fill_dock` | bool | Fill the dock slots `dock_apps` leaves free with the first grid apps (true by default); false leaves them empty |
 | `hidden_apps` | list of package names | Never shown as tiles |
